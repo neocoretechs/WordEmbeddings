@@ -1,0 +1,1 @@
+java -ea -Djava.library.path=C:/Users/groff/downloads/librocksdbjni-win64.dll -cp \Progra~1\apache\apache-tomcat\lib\RockSack.jar;\Progra~1\apache\apache-tomcat\lib\Relatrix.jar;\Progra~1\apache\apache-tomcat\lib\rocksdbjni-9.10.0-win64.jar;\Progra~1\apache\apache-tomcat\lib\WordEmbedding.jar com.neocoretechs.wordembedding.LoadWordEmbedding %1 %2 %3 %4
