@@ -6,43 +6,91 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
 
-import javax.json.bind.Jsonb;
-import javax.json.bind.JsonbBuilder;
-
+import com.neocoretechs.relatrix.Result;
+import com.neocoretechs.relatrix.Result2;
+import com.neocoretechs.relatrix.TransactionId;
+import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
 import com.neocoretechs.relatrix.client.RelatrixKVClientTransaction;
-import com.neocoretechs.rocksack.TransactionId;
+import com.neocoretechs.relatrix.type.DoubleArray;
+
 /**
+ * Operates on the inverted index of Glove50b word embedding vectors stored in Relatrix relationships.<p>
+ * This equates to the word mapped to a quantized value of each of the 50 vector elements mapped to the
+ * double array of vector values. The search takes the target word, gets the array of embedded values, quantizes them,
+ * retrieves each word that is mapped to each quantized value, then does the cosine similarity. This should reduce the
+ * search space from over 400k to less than 25k.<p>
+ * The purpose is to illustrate Relatix as a vector store that can process embeddings efficiently.<p>
  * Uses cosine similarity.  Euclidean distance or Manhattan distance, may affect the results.
  * @author groff
  *
  */
 public class FindEmbeddings {
-	private static RelatrixKVClientTransaction rtc;
+	//private static RelatrixKVClientTransaction rtc;
+	private static RelatrixClientTransaction rtc;
 	private static TransactionId xid;
 	static long tims = System.currentTimeMillis();
 	static int cnt2 = 0;
+	
 	public FindEmbeddings() {}
+	
 	@SuppressWarnings("unchecked")
 	public static List<String> findClosestEmbeddings(String word, int numResults) throws IOException {
 		List<Map.Entry<String, Double>> closestWords = new ArrayList<>();
-		double[] wordVector = (double[]) rtc.get(xid, word);
-		
-		Iterator<?> it = rtc.entrySet(xid,String.class);
-		while(it.hasNext()) {
-			Map.Entry<String,double[]> me = (Map.Entry<String,double[]>) it.next();
-			Jsonb jsonb = JsonbBuilder.create();
-			String result = jsonb.toJson(me);
-			System.out.println(result);
-			if (!me.getKey().equals(word)) {
-				double similarity = cosineSimilarity(wordVector, (double[]) me.getValue());
-				closestWords.add(new AbstractMap.SimpleEntry<>((String)me.getKey(), similarity));
+		//double[] wordVector = (double[]) rtc.get(xid, word);
+		//Iterator<?> it = rtc.entrySet(xid,String.class);
+		//while(it.hasNext()) {
+			//Map.Entry<String,double[]> me = (Map.Entry<String,double[]>) it.next();
+			//if(!me.getKey().equals(word)) {
+				//double similarity = cosineSimilarity(wordVector, (double[]) me.getValue());
+				//closestWords.add(new AbstractMap.SimpleEntry<>((String)me.getKey(), similarity));
+			//}
+		//}
+		//System.out.println("sorting..");
+		//closestWords.sort((o1, o) -> o2.getValue().compareTo(o1.getValue()));
+		//List<String> result = new A2rrayList<>();
+		//for (int i = 0; i < numResults; i++) {
+		//	result.add(closestWords.get(i).getKey());
+		//}
+		//return result;
+		// get the vector of the target word. An index to double array vector of embeddings is
+		// mapped to each quantized value of every word, so just get the first occurrence
+		//Optional<Result> ovec = rtc.findStream(xid, word, '*', '?').findFirst();
+		DoubleArray wordVector = null;
+		Iterator<?> targit = rtc.findSet(xid, word, '*', '?');
+		if(targit.hasNext())
+			wordVector = (DoubleArray) ((Result)targit.next()).get();
+		//if(ovec.isPresent())
+			//wordVector = (DoubleArray) ovec.get().get();
+		else {
+			System.out.println("Cant locate any occurrance of target word vecors for word:"+word);
+			rtc.endTransaction(xid);
+			rtc.close();
+			System.exit(1);
+		}
+		// Get relation for each word in inverted index that has a quantized value mapped to an array value of
+		// target word. This should ultimately constrain our total result set from 400k words to 25k or less
+		for(double dArrayVal: wordVector.get()) {
+			int vquant = (int)((dArrayVal + 1 / 2) * 255);
+			// get word and double array vector relation that maps to quantized inverted index element
+			Iterator<?> it = rtc.findSet(xid, '?', vquant, '?');
+			while(it.hasNext()) {
+				Result2 res = (Result2) it.next();
+				//Jsonb jsonb = JsonbBuilder.create();
+				//String result = jsonb.toJson(me);
+				//System.out.println(result);
+				if(!res.get(0).equals(word)) {
+					double similarity = cosineSimilarity(wordVector.get(), ((DoubleArray)res.get(1)).get());
+					closestWords.add(new AbstractMap.SimpleEntry<>((String)res.get(0), similarity));
+				}
+				if((System.currentTimeMillis()-tims) > 5000) {
+					System.out.println("Processed "+cnt2+" realtions. Total closest words accumulated="+closestWords.size());
+					tims = System.currentTimeMillis();
+				}
+				++cnt2;
 			}
-			if((System.currentTimeMillis()-tims) > 5000) {
-				System.out.println("Processed "+cnt2);
-				tims = System.currentTimeMillis();
-			}
-			++cnt2;
 		}
 		/*
 		rtc.entrySetStream(xid,String.class).forEach(e->{
@@ -58,7 +106,7 @@ public class FindEmbeddings {
 			++cnt2;
 		});
 		*/
-		System.out.println("sorting..");
+		System.out.println("sorting "+closestWords.size());
 		closestWords.sort((o1, o2) -> o2.getValue().compareTo(o1.getValue()));
 		List<String> result = new ArrayList<>();
 		for (int i = 0; i < numResults; i++) {
@@ -87,7 +135,7 @@ public class FindEmbeddings {
 	 */
 	public static void main(String args[]) throws Exception {
 		String word = args[0];
-		rtc = new RelatrixKVClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
+		rtc = new RelatrixClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
 		xid = rtc.getTransactionId();
 		int numResults = 5;
 		List<String> closestWords = findClosestEmbeddings(word, numResults);
@@ -95,5 +143,8 @@ public class FindEmbeddings {
 		for (String closestWord : closestWords) {
 			System.out.println(closestWord);
 		}
+		rtc.endTransaction(xid);
+		rtc.close();
+		System.exit(1);
 	}
 }
