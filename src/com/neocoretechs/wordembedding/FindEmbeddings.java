@@ -11,7 +11,7 @@ import java.util.Optional;
 
 import com.neocoretechs.relatrix.Result;
 import com.neocoretechs.relatrix.Result2;
-import com.neocoretechs.relatrix.TransactionId;
+import com.neocoretechs.rocksack.TransactionId;
 import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
 import com.neocoretechs.relatrix.client.RelatrixKVClientTransaction;
 import com.neocoretechs.relatrix.type.DoubleArray;

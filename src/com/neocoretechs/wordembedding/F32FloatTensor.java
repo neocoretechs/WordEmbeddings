@@ -10,7 +10,7 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 
-final class F32FloatTensor extends FloatTensor implements Externalizable, Comparable {
+public final class F32FloatTensor extends FloatTensor implements Externalizable, Comparable {
 	private static final long serialVersionUID = -1L;
 
 	int size;
@@ -24,23 +24,23 @@ final class F32FloatTensor extends FloatTensor implements Externalizable, Compar
 	}
 
 	@Override
-	int size() {
+	public int size() {
 		return size;
 	}
 
 	@Override
-	float getFloat(int index) {
+	public float getFloat(int index) {
 		assert 0 <= index && index < size;
 		return readFloat(memorySegment, index * 4);
 	}
 
 	@Override
-	void setFloat(int index, float value) {
+	public void setFloat(int index, float value) {
 		throw new UnsupportedOperationException("setFloat");	
 	}
 
 	@Override
-	FloatVector getFloatVector(VectorSpecies<Float> species, int offset) {
+	public FloatVector getFloatVector(VectorSpecies<Float> species, int offset) {
 		 throw new UnsupportedOperationException("getFloatVector");
 	}
 

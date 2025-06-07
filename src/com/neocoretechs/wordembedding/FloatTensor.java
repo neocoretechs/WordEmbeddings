@@ -57,20 +57,20 @@ public abstract class FloatTensor implements Externalizable, Comparable {
 	        }
 	    }
 
-	    abstract int size();
+	    public abstract int size();
 
-	    abstract float getFloat(int index);
+	    public abstract float getFloat(int index);
 
-	    abstract void setFloat(int index, float value);
+	    public abstract void setFloat(int index, float value);
 
-	    abstract FloatVector getFloatVector(VectorSpecies<Float> species, int offset);
+	    public abstract FloatVector getFloatVector(VectorSpecies<Float> species, int offset);
 
 	    public static int numberOfElements(int... dimensions) {
 	        assert Arrays.stream(dimensions).allMatch(i -> i > 0);
 	        return Arrays.stream(dimensions).reduce(Math::multiplyExact).orElseThrow();
 	    }
 
-	    static float scalarDot(FloatTensor thiz, int thisOffset, FloatTensor that, int thatOffset, int size) {
+	    public static float scalarDot(FloatTensor thiz, int thisOffset, FloatTensor that, int thatOffset, int size) {
 	        float result = 0f;
 	        for (int j = 0; j < size; j++) {
 	            result += thiz.getFloat(thisOffset + j) * that.getFloat(thatOffset + j);
@@ -78,15 +78,15 @@ public abstract class FloatTensor implements Externalizable, Comparable {
 	        return result;
 	    }
 
-	    float dot(int thisOffset, FloatTensor that, int thatOffset, int size) {
+	    public float dot(int thisOffset, FloatTensor that, int thatOffset, int size) {
 	        return scalarDot(this, thisOffset, that, thatOffset, size);
 	    }
 
-	    void matmul(FloatTensor that, FloatTensor out, int dim0, int dim1) {
+	    public void matmul(FloatTensor that, FloatTensor out, int dim0, int dim1) {
 	        Parallel.parallelFor(0, dim0, i -> out.setFloat(i, dot(i * dim1, that, 0, dim1)));
 	    }
 
-	    void matmul(int context, FloatTensor[] that, FloatTensor[] out, int dim0, int dim1) {
+	    public void matmul(int context, FloatTensor[] that, FloatTensor[] out, int dim0, int dim1) {
 	        if (that.length != out.length) {
 	            throw new IllegalArgumentException(String.format("that.len=%d, out.len=%d", that.length, out.length));
 	        }
@@ -214,7 +214,7 @@ public abstract class FloatTensor implements Externalizable, Comparable {
 	        return this;
 	    }
 	    
-	    float cosineSimilarity(FloatTensor a, FloatTensor b) {
+	    public static float cosineSimilarity(FloatTensor a, FloatTensor b) {
 	    	float dotProduct = a.dot(0, b, 0, a.size());
 	    	DoubleAdder aNormAdder = new DoubleAdder();
 	    	DoubleAdder bNormAdder = new DoubleAdder();

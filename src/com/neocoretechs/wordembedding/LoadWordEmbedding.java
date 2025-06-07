@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import jdk.incubator.vector.*;
 import java.lang.foreign.Arena;
@@ -16,6 +17,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 
 import com.neocoretechs.wordembedding.FloatTensor;
+
 import com.neocoretechs.wordembedding.F32FloatTensor;
 
 import com.neocoretechs.rocksack.TransactionId;
@@ -37,16 +39,20 @@ public class LoadWordEmbedding {
 	private static RelatrixClientTransaction rtc;
 	private static TransactionId xid;
 	private static int COMMITRATE = 1000;
-
+	public static ArrayList<F32FloatTensor> tensors = new ArrayList<F32FloatTensor>();
+	public static ArrayList<String> words = new ArrayList<String>();
 	public LoadWordEmbedding() {}
 
-	private static void loadVectors(FileChannel fileChannel) throws IOException {
+	private static void loadVectors(String path) throws IOException {
 		String line;
 		long tims = System.currentTimeMillis();
       	long tim2 = System.currentTimeMillis();
 		int cnt2 = 0;
 		int cnt = 0;
+		/*
+		 * MemorySegment and FileChannel, surprisingly slow
 	    Arena arena = Arena.ofAuto();
+	    try (FileChannel fileChannel = FileChannel.open(FileSystems.getDefault().getPath(path))) {
         MemorySegment tensorData = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size(), arena);
         int index = 0;
         boolean newLine = true;
@@ -76,11 +82,38 @@ public class LoadWordEmbedding {
     			F32FloatTensor f32 = new F32FloatTensor(VECTOR_DIMENSION, MemorySegment.ofArray(vector.get()));
     			//System.out.println(f32);
     			++cnt;
+    			tensors.add(f32);
+    			words.add(word);
             }
             if((System.currentTimeMillis()-tim2) > 5000) {
             	tim2 = System.currentTimeMillis();
             	System.out.println("Loaded "+index+" bytes "+cnt+" vectors in "+(System.currentTimeMillis()-tims)+" ms.");
             }
+		}
+		}
+		*/
+		List<String[]> data = FileUtils.readCSVFile(path, " ", -1);
+		for(String[] sb: data) {
+			String[] parts = sb.toString().split(" ");
+			String word = parts[0];
+			//double[] vector = new double[VECTOR_DIMENSION];
+			FloatArray vector = new FloatArray(VECTOR_DIMENSION);
+			ArrayList<Comparable[]> multiStore = new ArrayList<Comparable[]>();
+			for (int i = 0; i < VECTOR_DIMENSION; i++) {
+				//vector[i] = Double.parseDouble(parts[i + 1]);
+				vector.get()[i] = Float.parseFloat(parts[i + 1]);	
+				//Comparable[] c = new Comparable[]{word, vquant, vector};
+				//multiStore.add(c);
+			}
+			F32FloatTensor f32 = new F32FloatTensor(VECTOR_DIMENSION, MemorySegment.ofArray(vector.get()));
+			//System.out.println(f32);
+			++cnt;
+			tensors.add(f32);
+			words.add(word);
+			if((System.currentTimeMillis()-tim2) > 5000) {
+				tim2 = System.currentTimeMillis();
+				System.out.println("Loaded "+cnt+" vectors in "+(System.currentTimeMillis()-tims)+" ms.");
+			}
 		}
 		/*
 			// store inverted index of word, quantized vector element, vector
@@ -100,6 +133,12 @@ public class LoadWordEmbedding {
 		rtc.commit(xid);
 		*/
 	}
+	
+	public static ArrayList<F32FloatTensor> loadTensors(String path) throws IOException {
+        loadVectors(path);
+		return tensors;
+	}
+
 	/**
 	 * Command line: Glove data file, local node, remote node, remote port
 	 * @param args
@@ -109,9 +148,40 @@ public class LoadWordEmbedding {
 		//rtc = new RelatrixKVClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
 		//rtc = new RelatrixClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
 		//xid = rtc.getTransactionId();
-		try (FileChannel fileChannel = FileChannel.open(FileSystems.getDefault().getPath(args[0]))) {
-	             loadVectors(fileChannel);
+		ArrayList<F32FloatTensor> tensors = loadTensors(args[0]);
+		int windex = words.indexOf(args[1]);
+		if(windex == -1)
+			System.exit(1);
+		int matches = 0;
+		int exceeds = 0;
+		double min = 0.0;
+		double mincos = 0.0;
+		//MinHash th = new MinHash(tensors.get(windex));
+		for(int wcnt = 0 ; wcnt < tensors.size(); wcnt++) {
+			if(wcnt != windex) {
+				//MinHash mh = new MinHash(tensors.get(wcnt));
+				//double sim = MinHash.similarity(th.getSignature(), mh.getSignature());
+				double sim = -1; // TODO: replace with algo
+				double sim2 = FloatTensor.cosineSimilarity(tensors.get(windex),tensors.get(wcnt));
+				if(sim > min)
+					min = sim;
+				if(sim > .8) {
+					System.out.println(">.8 match:"+words.get(wcnt)+" and "+words.get(windex)+" index "+wcnt+" ="+sim+" cos:"+sim2);
+					++matches;
+				} else {
+					if(sim > .5)
+						System.out.println(">.5 match:"+words.get(wcnt)+" and "+words.get(windex)+" = "+sim+" index "+wcnt+" cos:"+sim2);
+				}
+				if(sim2 > mincos)
+					mincos = sim2;
+				if(sim2 > sim) {
+					System.out.println("COS exceeded MinHash for:"+words.get(wcnt)+" and "+words.get(windex)+" index "+wcnt+" ="+sim+" cos:"+sim2);
+					++exceeds;
+				} 
+				//System.out.println(Arrays.toString(mh.getSignature()));
+			}
 		}
-
+		System.out.println(">.8 "+matches+" out of "+tensors.size()+" max best:"+min);
+		System.out.println("COS exceeds MinHash "+exceeds+" out of "+tensors.size()+" max best:"+mincos);
 	}
 }

@@ -5,7 +5,7 @@ import java.util.function.LongConsumer;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
-final class Parallel {
+public final class Parallel {
     public static void parallelFor(int startInclusive, int endExclusive, IntConsumer action) {
         if (startInclusive == 0 && endExclusive == 1) {
             action.accept(0);
