@@ -115,6 +115,43 @@ public class FindEmbeddings {
 		return result;
 	}
 	
+	public static void memoryFind(List<String> words, List<FloatTensor> tensors, String target) {
+		int windex = words.indexOf(target);
+		if(windex == -1)
+			System.exit(1);
+		int matches = 0;
+		int exceeds = 0;
+		double min = 0.0;
+		double mincos = 0.0;
+		//MinHash th = new MinHash(tensors.get(windex));
+		for(int wcnt = 0 ; wcnt < tensors.size(); wcnt++) {
+			if(wcnt != windex) {
+				//MinHash mh = new MinHash(tensors.get(wcnt));
+				//double sim = MinHash.similarity(th.getSignature(), mh.getSignature());
+				double sim = -1; // TODO: replace with algo
+				double sim2 = FloatTensor.cosineSimilarity(tensors.get(windex),tensors.get(wcnt));
+				if(sim > min)
+					min = sim;
+				if(sim > .8) {
+					System.out.println(">.8 match:"+words.get(wcnt)+" and "+words.get(windex)+" index "+wcnt+" ="+sim+" cos:"+sim2);
+					++matches;
+				} else {
+					if(sim > .5)
+						System.out.println(">.5 match:"+words.get(wcnt)+" and "+words.get(windex)+" = "+sim+" index "+wcnt+" cos:"+sim2);
+				}
+				if(sim2 > mincos)
+					mincos = sim2;
+				if(sim2 > sim) {
+					System.out.println("COS exceeded MinHash for:"+words.get(wcnt)+" and "+words.get(windex)+" index "+wcnt+" ="+sim+" cos:"+sim2);
+					++exceeds;
+				} 
+				//System.out.println(Arrays.toString(mh.getSignature()));
+			}
+		}
+		System.out.println(">.8 "+matches+" out of "+tensors.size()+" max best:"+min);
+		System.out.println("COS exceeds MinHash "+exceeds+" out of "+tensors.size()+" max best:"+mincos);
+	}
+	
     public static double cosineSimilarity(double[] vector1, double[] vector2) {
         double dotProduct = 0;
         double magnitude1 = 0;

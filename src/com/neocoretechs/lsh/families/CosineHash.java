@@ -3,6 +3,8 @@ package com.neocoretechs.lsh.families;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import jdk.incubator.vector.*;
+
+import java.io.Serializable;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -40,9 +42,11 @@ import com.neocoretechs.wordembedding.FloatTensor;
  * making it a powerful technique for similarity search and clustering applications.
  *
  */
-public class CosineHash {
+public class CosineHash implements Serializable {
 	private static final long serialVersionUID = 778951747630668248L;
-	final FloatTensor randomProjection;
+	FloatTensor randomProjection;
+	
+	public CosineHash() {}
 	
 	public CosineHash(int dimensions){
 	    ThreadLocalRandom rand  = ThreadLocalRandom.current();
