@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
 import com.neocoretechs.lsh.families.CosineHash;
 import com.neocoretechs.relatrix.DuplicateKeyException;
@@ -43,20 +44,19 @@ import com.neocoretechs.wordembedding.Parallel;
  * a given set of floating point tensors.
  * @author Jonathan Groff Copyright (C) NeoCoreTechs 2025
  */
-public class RelatrixLSH implements Serializable {
+public class RelatrixLSH implements Serializable, Comparable {
 	private static final long serialVersionUID = -5410017645908038641L;
 	private static boolean DEBUG = true;
 	public static final int VECTOR_DIMENSION = 50;
-	public static int numberOfHashTables = 8;
-	public static int numberOfHashes = 8;
-	private static int radius = 500;
+	public static int numberOfHashTables = 16;
+	public static int numberOfHashes = 12;
+
 	/**
 	 * Contains the mapping between a combination of a number of hashes (encoded
 	 * using an integer) and a list of possible nearest neighbours
 	 */
-	private CosineHash[] hashFunctions;
-	private CosineHash family;
-	private int index;
+	private List<CosineHash[]> hashTable;
+	private UUID key;
 	
 	public RelatrixLSH() {}
 	/**
@@ -69,18 +69,26 @@ public class RelatrixLSH implements Serializable {
 	 *            The hash function family knows how to create new hash
 	 *            functions, and is used therefore.
 	 */
-	public RelatrixLSH(int index, int numberOfHashes, int projectionVectorSize) {
-		this.index = index;
-	    this.hashFunctions = new CosineHash[numberOfHashes];
-	    if(numberOfHashes > 64)
-	    	Parallel.parallelFor(0, numberOfHashes, i -> {
-	    		hashFunctions[i] = new CosineHash(projectionVectorSize);
-	    	});
-	    else
-	    	for(int i = 0; i < numberOfHashes; i++)
-	    		hashFunctions[i] = new CosineHash(projectionVectorSize);
+	public RelatrixLSH(int numberOfHashes, int numberOfHashTables, int projectionVectorSize) {
+		this.key = UUID.randomUUID();
+		this.hashTable = new ArrayList<CosineHash[]>();
+		for(int i = 0; i < numberOfHashTables; i++) {
+			final CosineHash[] cHash = new CosineHash[numberOfHashes];
+			this.hashTable.add(cHash);
+			if(numberOfHashes > 64)
+				Parallel.parallelFor(0, numberOfHashes, j -> {
+					cHash[j] = new CosineHash(projectionVectorSize);
+				});
+			else
+				for(int j = 0; j < numberOfHashes; j++)
+					cHash[j] = new CosineHash(projectionVectorSize);
+		}
 	}
-
+	
+	public UUID getKey() {
+		return key;
+	}
+	
 	/**
 	 * Query the hash table for a vector. It calculates the hash for the vector,
 	 * and does a lookup in the hash table. If no candidates are found, an empty
@@ -90,49 +98,57 @@ public class RelatrixLSH implements Serializable {
 	 *            The query vector.
 	 * @return Does a lookup in the table for a query using its hash. If no
 	 *         candidates are found, an empty list is returned, otherwise, the
-	 *         list of candidates is returned.
+	 *         list of candidates is returned as word, List<FloatTensor>
 	 * @throws IOException 
 	 * @throws IllegalAccessException 
 	 * @throws ClassNotFoundException 
 	 * @throws IllegalArgumentException 
 	 */
-	public List<FloatTensor> query(FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
-		Integer combinedHash = hash(query);
-		if(DEBUG)
-			System.out.println("Combined hash for query:"+combinedHash);
-		Iterator<?> it = Relatrix.findSet(combinedHash, index, '?');
-		ArrayList<FloatTensor> res = new ArrayList<FloatTensor>();
-		while(it.hasNext()) {
-			Result r= (Result) it.next();
-			res = (ArrayList<FloatTensor>)r.get();
+	public Result query(FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+		for(int i = 0; i < hashTable.size(); i++) {
+			Integer combinedHash = hash(hashTable.get(i), query);
+			if(DEBUG)
+				System.out.println("Combined hash for query:"+combinedHash);
+			Iterator<?> it = Relatrix.findSet(combinedHash, '?', '?');
+			while(it.hasNext()) {
+				return (Result) it.next();
+			}
 		}
-		return res;
+		return null;
 	}
 
 	/**
 	 * Add a vector to the index.
-	 * @param vector
+	 * @param word the word that vectorized
+	 * @param vector the embedding of the word
 	 * @throws DuplicateKeyException 
 	 * @throws IOException 
 	 * @throws ClassNotFoundException 
 	 * @throws IllegalAccessException 
 	 */
-	public void add(FloatTensor vector) throws IllegalAccessException, ClassNotFoundException, IOException, DuplicateKeyException {
-		Integer combinedHash = hash(vector);
-		Relatrix.store(combinedHash, index, vector);
+	public void add(String word, FloatTensor vector) throws IllegalAccessException, ClassNotFoundException, IOException {
+		for(int i = 0; i < hashTable.size(); i++) {
+			Integer combinedHash = hash(hashTable.get(i), vector);
+			try {
+				Relatrix.store(combinedHash, word, vector);
+			} catch (DuplicateKeyException e) {
+				System.out.println("duplicate key:"+combinedHash+" for "+word);
+			}
+		}
 	}
 	
 	/**
 	 * Calculate the combined hash for a vector.
+	 * @param hash one of numberOfHashes
 	 * @param vector The vector to calculate the combined hash for.
 	 * @return An integer representing a combined hash.
 	 */
-	private Integer hash(FloatTensor vector){
-		int hashes[] = new int[hashFunctions.length];
-		for(int i = 0 ; i < hashFunctions.length ; i++){
-			hashes[i] = hashFunctions[i].hash(vector);
+	private Integer hash(CosineHash[] hash, FloatTensor vector){
+		int hashes[] = new int[hash.length];
+		for(int i = 0 ; i < hash.length ; i++){
+			hashes[i] = hash[i].hash(vector);
 		}
-		Integer combinedHash = family.combine(hashes);
+		Integer combinedHash = CosineHash.combine(hashes);
 		return combinedHash;
 	}
 
@@ -141,11 +157,30 @@ public class RelatrixLSH implements Serializable {
 	 * @return The number of hash functions used in the hash table.
 	 */
 	public int getNumberOfHashes() {
-		return hashFunctions.length;
+		return hashTable.get(0).length;
 	}
 
 	@Override
 	public String toString() {
-		return String.format("%s index=%d family=%s hashes=%s",this.getClass().getName(), index, family, Arrays.toString(hashFunctions));
+		return String.format("%s key=%s tables=%d hashes=%d",this.getClass().getName(), key, numberOfHashTables, numberOfHashes);
+	}
+	
+	@Override
+	public int compareTo(Object o) {
+		int key0 = key.compareTo(((RelatrixLSH)o).key);
+		if(key0 != 0)
+			return key0;
+		for(int i = 0; i < hashTable.size(); i++) {
+			CosineHash[] cos0 = hashTable.get(i);
+			CosineHash[] cos1 = (((RelatrixLSH)o).hashTable.get(i));
+			for(int j = 0; j < cos0.length; j++) {
+				if(j >= cos1.length)
+					return 1;
+				int key1 = cos0[j].compareTo(cos1[j]);
+				if(key1 != 0)
+					return key1;
+			}
+		}
+		return 0;
 	}
 }

@@ -100,7 +100,7 @@ class HashTable implements Serializable {
 	 */
 	public void add(FloatTensor vector) {
 		Integer combinedHash = hash(vector);
-		if(! hashTable.containsKey(combinedHash)){
+		if(!hashTable.containsKey(combinedHash)){
 			hashTable.put(combinedHash, new ArrayList<FloatTensor>());
 		}
 		hashTable.get(combinedHash).add(vector);
@@ -116,7 +116,7 @@ class HashTable implements Serializable {
 		for(int i = 0 ; i < hashFunctions.length ; i++){
 			hashes[i] = hashFunctions[i].hash(vector);
 		}
-		Integer combinedHash = family.combine(hashes);
+		Integer combinedHash = CosineHash.combine(hashes);
 		return combinedHash;
 	}
 

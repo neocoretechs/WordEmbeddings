@@ -42,7 +42,7 @@ import com.neocoretechs.wordembedding.FloatTensor;
  * making it a powerful technique for similarity search and clustering applications.
  *
  */
-public class CosineHash implements Serializable {
+public class CosineHash implements Serializable, Comparable {
 	private static final long serialVersionUID = 778951747630668248L;
 	FloatTensor randomProjection;
 	
@@ -50,22 +50,25 @@ public class CosineHash implements Serializable {
 	
 	public CosineHash(int dimensions){
 	    ThreadLocalRandom rand  = ThreadLocalRandom.current();
-	    MemorySegment segment = MemorySegment.ofArray(new float[dimensions]);
-	    randomProjection = new F32FloatTensor(dimensions, segment);
+	    float[] randomp = new float[dimensions];
 	    if(dimensions > 1000) {
 	    	Parallel.parallelFor(0, dimensions, d -> {
 	    		double val = rand.nextGaussian();
-	    		randomProjection.setFloat(d, (float) val);
+	    		//randomProjection.setFloat(d, (float) val);
+	    		randomp[d] = (float)val;
 	    	});
 	    } else {
 	    	for(int d=0; d<dimensions; d++) {
 	    		double val = rand.nextGaussian();
-	    		randomProjection.setFloat(d, (float) val);
+	    		//randomProjection.setFloat(d, (float) val);
+	    		randomp[d] = (float)val;
 	    	}
 	    }
+	    MemorySegment segment = MemorySegment.ofArray(randomp);
+	    randomProjection = new F32FloatTensor(dimensions, segment);
 	}
 	
-	public Integer combine(int[] hashes) {
+	public static Integer combine(int[] hashes) {
 		//Treat the hashes as a series of bits.
 		//They are either zero or one, the index 
 		//represents the value.
@@ -91,5 +94,10 @@ public class CosineHash implements Serializable {
 	public String toString(){
 		//return String.format("%s\nrandomProjection:%s",this.getClass().getName(), randomProjection);
 		return String.format("%s randomProjectionSize=%d",this.getClass().getName(), randomProjection.size());
+	}
+
+	@Override
+	public int compareTo(Object arg0) {
+		return randomProjection.compareTo(arg0);
 	}
 }

@@ -23,7 +23,7 @@ import com.neocoretechs.rocksack.TransactionId;
 
 import com.neocoretechs.lsh.Index;
 import com.neocoretechs.lsh.RelatrixLSH;
-
+import com.neocoretechs.relatrix.DuplicateKeyException;
 import com.neocoretechs.relatrix.Relatrix;
 import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
 //import com.neocoretechs.relatrix.client.RelatrixKVClientTransaction;
@@ -99,14 +99,14 @@ public class LoadWordEmbedding {
 		*/
 		List<String[]> data = FileUtils.readCSVFile(path, " ", -1);
 		for(String[] sb: data) {
-			String[] parts = sb.toString().split(" ");
-			String word = parts[0];
+			//String[] parts = sb.toString().split(" ");
+			String word = sb[0];
 			//double[] vector = new double[VECTOR_DIMENSION];
 			FloatArray vector = new FloatArray(VECTOR_DIMENSION);
 			ArrayList<Comparable[]> multiStore = new ArrayList<Comparable[]>();
 			for (int i = 0; i < VECTOR_DIMENSION; i++) {
 				//vector[i] = Double.parseDouble(parts[i + 1]);
-				vector.get()[i] = Float.parseFloat(parts[i + 1]);	
+				vector.get()[i] = Float.parseFloat(sb[i + 1]);	
 				//Comparable[] c = new Comparable[]{word, vquant, vector};
 				//multiStore.add(c);
 			}
@@ -148,16 +148,30 @@ public class LoadWordEmbedding {
 	 * Command line: Glove data file, local node, remote node, remote port
 	 * @param args
 	 * @throws IOException
+	 * @throws DuplicateKeyException 
+	 * @throws ClassNotFoundException 
+	 * @throws IllegalAccessException 
 	 */
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, IllegalAccessException, ClassNotFoundException, DuplicateKeyException {
 		//rtc = new RelatrixKVClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
 		//rtc = new RelatrixClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
 		//xid = rtc.getTransactionId();
 		Relatrix.setTablespace(embedPath);
 		ArrayList<F32FloatTensor> tensors = loadTensors(args[0]);
-		RelatrixLSH[] rlsh = new RelatrixLSH[RelatrixLSH.numberOfHashTables];
-		for(int i = 0; i < RelatrixLSH.numberOfHashTables; i++)
-			rlsh[i] = new RelatrixLSH(i, RelatrixLSH.numberOfHashes, RelatrixLSH.VECTOR_DIMENSION);
-		
+		RelatrixLSH rlsh = new RelatrixLSH(RelatrixLSH.numberOfHashes, RelatrixLSH.numberOfHashTables, RelatrixLSH.VECTOR_DIMENSION);
+		try {
+			Relatrix.store(rlsh.getKey(), "has index", rlsh);
+		} catch (IllegalAccessException | ClassNotFoundException | IOException | DuplicateKeyException e) {
+				e.printStackTrace();
+		}
+		long tims = System.currentTimeMillis();
+		long tim2 = System.currentTimeMillis();
+		for(int i = 0; i < tensors.size(); i++) {
+			rlsh.add(words.get(i), tensors.get(i));
+			if((System.currentTimeMillis()-tim2) > 5000) {
+				tim2 = System.currentTimeMillis();
+				System.out.println("Loaded "+i+" vectors in "+(System.currentTimeMillis()-tims)+" ms.");
+			}
+		}
 	}
 }
