@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 import com.neocoretechs.lsh.families.CosineHash;
-import com.neocoretechs.lsh.families.DistanceComparator;
+import com.neocoretechs.lsh.families.DistanceComparator2;
 import com.neocoretechs.wordembedding.FileUtils;
 import com.neocoretechs.wordembedding.FloatTensor;
 
@@ -122,11 +122,11 @@ public class Index implements Serializable{
 				LOG.info("returned "+v.size()+" elements");
 			candidateSet.addAll(v);
 		}
-		List<FloatTensor>candidates = new ArrayList<FloatTensor>(candidateSet);
+		List<FloatTensor> candidates = new ArrayList<FloatTensor>(candidateSet);
 		evaluated += candidates.size();
 		if(DEBUG)
 			LOG.info("evaluated:"+evaluated);
-		DistanceComparator dc = new DistanceComparator(query);
+		DistanceComparator2 dc = new DistanceComparator2(query);
 		Collections.sort(candidates,dc);
 		if(maxSize > 0 && candidates.size() > maxSize){
 			candidates = candidates.subList(0, maxSize);

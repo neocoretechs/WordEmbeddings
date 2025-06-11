@@ -121,6 +121,34 @@ public final class FileUtils {
 		}
 	}
 
+	public static void writeFile(List<Candidates> contents, final String name, final boolean append) {
+		BufferedWriter outputStream = null;
+		PrintWriter output = null;
+		FileWriter fileWriter = null;
+		try {
+			fileWriter = new FileWriter(name, append);
+			outputStream = new BufferedWriter(fileWriter);
+			output = new PrintWriter(outputStream);
+			for(Candidates can: contents)
+				output.println(can.toString());
+			outputStream.flush();
+			output.close();
+		} catch (final IOException e) {
+			LOG.log(Level.SEVERE, "Could not write file " + name, e);
+		} finally {
+			try {
+				if (outputStream != null) {
+					outputStream.close();
+				}
+				if (output != null) {
+					output.close();
+				}
+			} catch (final IOException e) {
+				LOG.log(Level.SEVERE, "Failed to close file: " + name, e);
+			}
+		}
+	}
+
 	/**
 	 * Appends a string to a file on disk. Fails silently.
 	 * 

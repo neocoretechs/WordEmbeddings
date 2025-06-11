@@ -1,20 +1,17 @@
 package com.neocoretechs.wordembedding;
 
 import java.io.IOException;
-import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
 
+import com.neocoretechs.lsh.RelatrixLSH;
+import com.neocoretechs.lsh.families.DistanceComparator;
+import com.neocoretechs.relatrix.Relatrix;
 import com.neocoretechs.relatrix.Result;
-import com.neocoretechs.relatrix.Result2;
 import com.neocoretechs.rocksack.TransactionId;
 import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
-import com.neocoretechs.relatrix.client.RelatrixKVClientTransaction;
-import com.neocoretechs.relatrix.type.DoubleArray;
 
 /**
  * Operates on the inverted index of Glove50b word embedding vectors stored in Relatrix relationships.<p>
@@ -36,121 +33,6 @@ public class FindEmbeddings {
 	
 	public FindEmbeddings() {}
 	
-	@SuppressWarnings("unchecked")
-	public static List<String> findClosestEmbeddings(String word, int numResults) throws IOException {
-		List<Map.Entry<String, Double>> closestWords = new ArrayList<>();
-		//double[] wordVector = (double[]) rtc.get(xid, word);
-		//Iterator<?> it = rtc.entrySet(xid,String.class);
-		//while(it.hasNext()) {
-			//Map.Entry<String,double[]> me = (Map.Entry<String,double[]>) it.next();
-			//if(!me.getKey().equals(word)) {
-				//double similarity = cosineSimilarity(wordVector, (double[]) me.getValue());
-				//closestWords.add(new AbstractMap.SimpleEntry<>((String)me.getKey(), similarity));
-			//}
-		//}
-		//System.out.println("sorting..");
-		//closestWords.sort((o1, o) -> o2.getValue().compareTo(o1.getValue()));
-		//List<String> result = new A2rrayList<>();
-		//for (int i = 0; i < numResults; i++) {
-		//	result.add(closestWords.get(i).getKey());
-		//}
-		//return result;
-		// get the vector of the target word. An index to double array vector of embeddings is
-		// mapped to each quantized value of every word, so just get the first occurrence
-		//Optional<Result> ovec = rtc.findStream(xid, word, '*', '?').findFirst();
-		DoubleArray wordVector = null;
-		Iterator<?> targit = rtc.findSet(xid, word, '*', '?');
-		if(targit.hasNext())
-			wordVector = (DoubleArray) ((Result)targit.next()).get();
-		//if(ovec.isPresent())
-			//wordVector = (DoubleArray) ovec.get().get();
-		else {
-			System.out.println("Cant locate any occurrance of target word vecors for word:"+word);
-			rtc.endTransaction(xid);
-			rtc.close();
-			System.exit(1);
-		}
-		// Get relation for each word in inverted index that has a quantized value mapped to an array value of
-		// target word. This should ultimately constrain our total result set from 400k words to 25k or less
-		for(double dArrayVal: wordVector.get()) {
-			int vquant = (int)((dArrayVal + 1 / 2) * 255);
-			// get word and double array vector relation that maps to quantized inverted index element
-			Iterator<?> it = rtc.findSet(xid, '?', vquant, '?');
-			while(it.hasNext()) {
-				Result2 res = (Result2) it.next();
-				//Jsonb jsonb = JsonbBuilder.create();
-				//String result = jsonb.toJson(me);
-				//System.out.println(result);
-				if(!res.get(0).equals(word)) {
-					double similarity = cosineSimilarity(wordVector.get(), ((DoubleArray)res.get(1)).get());
-					closestWords.add(new AbstractMap.SimpleEntry<>((String)res.get(0), similarity));
-				}
-				if((System.currentTimeMillis()-tims) > 5000) {
-					System.out.println("Processed "+cnt2+" realtions. Total closest words accumulated="+closestWords.size());
-					tims = System.currentTimeMillis();
-				}
-				++cnt2;
-			}
-		}
-		/*
-		rtc.entrySetStream(xid,String.class).forEach(e->{
-			Map.Entry<String,double[]> me = (Map.Entry<String,double[]>)e;
-			if (!me.getKey().equals(word)) {
-				double similarity = cosineSimilarity(wordVector, me.getValue());
-				closestWords.add(new AbstractMap.SimpleEntry<>(me.getKey(), similarity));
-			}
-			if((System.currentTimeMillis()-tims) > 5000) {
-				System.out.println("Processed "+cnt2);
-				tims = System.currentTimeMillis();
-			}
-			++cnt2;
-		});
-		*/
-		System.out.println("sorting "+closestWords.size());
-		closestWords.sort((o1, o2) -> o2.getValue().compareTo(o1.getValue()));
-		List<String> result = new ArrayList<>();
-		for (int i = 0; i < numResults; i++) {
-			result.add(closestWords.get(i).getKey());
-		}
-		return result;
-	}
-	
-	public static void memoryFind(List<String> words, List<FloatTensor> tensors, String target) {
-		int windex = words.indexOf(target);
-		if(windex == -1)
-			System.exit(1);
-		int matches = 0;
-		int exceeds = 0;
-		double min = 0.0;
-		double mincos = 0.0;
-		//MinHash th = new MinHash(tensors.get(windex));
-		for(int wcnt = 0 ; wcnt < tensors.size(); wcnt++) {
-			if(wcnt != windex) {
-				//MinHash mh = new MinHash(tensors.get(wcnt));
-				//double sim = MinHash.similarity(th.getSignature(), mh.getSignature());
-				double sim = -1; // TODO: replace with algo
-				double sim2 = FloatTensor.cosineSimilarity(tensors.get(windex),tensors.get(wcnt));
-				if(sim > min)
-					min = sim;
-				if(sim > .8) {
-					System.out.println(">.8 match:"+words.get(wcnt)+" and "+words.get(windex)+" index "+wcnt+" ="+sim+" cos:"+sim2);
-					++matches;
-				} else {
-					if(sim > .5)
-						System.out.println(">.5 match:"+words.get(wcnt)+" and "+words.get(windex)+" = "+sim+" index "+wcnt+" cos:"+sim2);
-				}
-				if(sim2 > mincos)
-					mincos = sim2;
-				if(sim2 > sim) {
-					System.out.println("COS exceeded MinHash for:"+words.get(wcnt)+" and "+words.get(windex)+" index "+wcnt+" ="+sim+" cos:"+sim2);
-					++exceeds;
-				} 
-				//System.out.println(Arrays.toString(mh.getSignature()));
-			}
-		}
-		System.out.println(">.8 "+matches+" out of "+tensors.size()+" max best:"+min);
-		System.out.println("COS exceeds MinHash "+exceeds+" out of "+tensors.size()+" max best:"+mincos);
-	}
 	
     public static double cosineSimilarity(double[] vector1, double[] vector2) {
         double dotProduct = 0;
@@ -171,17 +53,64 @@ public class FindEmbeddings {
 	 * @throws Exception
 	 */
 	public static void main(String args[]) throws Exception {
-		String word = args[0];
-		rtc = new RelatrixClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
-		xid = rtc.getTransactionId();
-		int numResults = 5;
-		List<String> closestWords = findClosestEmbeddings(word, numResults);
-		System.out.println("Closest words to '" + word + "':");
-		for (String closestWord : closestWords) {
-			System.out.println(closestWord);
+		//String word = args[0];
+		//rtc = new RelatrixClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
+		//xid = rtc.getTransactionId();
+		//int numResults = 5;
+		//ArrayList<F32FloatTensor> tensors = loadTensors(args[0]);
+		//List<String> closestWords = findClosestEmbeddings(word, numResults);
+		//System.out.println("Closest words to '" + word + "':");
+		//for (String closestWord : closestWords) {
+		//	System.out.println(closestWord);
+		//}
+		//rtc.endTransaction(xid);
+		//rtc.close();
+		Relatrix.setTablespace(LoadWordEmbedding.embedPath);
+		RelatrixLSH index = null;
+		List<Result> nearest = null;
+		try {
+			Iterator<?> it = Relatrix.findSet('*', "has index", '?');
+			if(!it.hasNext()) {
+				System.out.println("No LSH index...");
+				System.exit(1);
+			}
+			Result res = (Result) it.next();
+			index = (RelatrixLSH) res.get();
+			// now get the tensor with the target word embedding
+			it = Relatrix.findSet('?',  args[0], '?');
+			if(!it.hasNext()) {
+				System.out.println("No tensor found for target word "+args[0]);
+				System.exit(1);
+			}
+			res = (Result) it.next();
+			int tIndex = (int) res.get(0);
+			F32FloatTensor tTensor = (F32FloatTensor) res.get(1);
+			nearest = index.query(tTensor);
+			System.out.println("Target word index:"+tIndex);
+			DistanceComparator dc = new DistanceComparator(tTensor);
+			List<Candidates> candidateList = new ArrayList<Candidates>();
+			for(int i = 0; i  < nearest.size(); i++) {
+				Candidates can = new Candidates();
+				can.word = (String) nearest.get(i).get(0);
+				can.tensor = (FloatTensor) nearest.get(i).get(1);
+				can.cosDist = FloatTensor.cosineSimilarity(tTensor, can.tensor);
+				int cnt = 0;
+				if(!candidateList.contains(can)) {
+					candidateList.add(can);
+					System.out.print(i+" "+(++cnt)+"\r");
+				}
+			}
+			FileUtils.writeFile(candidateList, args[0]+".txt", false);
+			System.out.println("-----");
+			Collections.sort(candidateList,dc);
+			for(Candidates c: candidateList)
+				System.out.println(c);
+		} catch (IllegalAccessException | ClassNotFoundException | IOException e) {
+				e.printStackTrace();
+				System.exit(1);
 		}
-		rtc.endTransaction(xid);
-		rtc.close();
+
 		System.exit(1);
 	}
+
 }

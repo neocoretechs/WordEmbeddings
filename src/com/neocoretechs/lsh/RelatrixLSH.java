@@ -104,17 +104,21 @@ public class RelatrixLSH implements Serializable, Comparable {
 	 * @throws ClassNotFoundException 
 	 * @throws IllegalArgumentException 
 	 */
-	public Result query(FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+	public List<Result> query(FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+		ArrayList<Result> res = new ArrayList<Result>();
 		for(int i = 0; i < hashTable.size(); i++) {
 			Integer combinedHash = hash(hashTable.get(i), query);
 			if(DEBUG)
-				System.out.println("Combined hash for query:"+combinedHash);
+				System.out.println("Querying combined hash for query "+i+" of "+hashTable.size()+":"+combinedHash);
 			Iterator<?> it = Relatrix.findSet(combinedHash, '?', '?');
+			int cnt = 0;
 			while(it.hasNext()) {
-				return (Result) it.next();
+				res.add((Result) it.next());
+				System.out.print(++cnt+"\r");
 			}
+			System.out.println();
 		}
-		return null;
+		return res;
 	}
 
 	/**

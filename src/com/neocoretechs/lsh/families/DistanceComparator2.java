@@ -12,12 +12,12 @@ import com.neocoretechs.wordembedding.FloatTensor;
  * candidates found in colliding hash bins.
  * 
  */
-public class DistanceComparator implements Comparator<Candidates>{
+public class DistanceComparator2 implements Comparator<FloatTensor>{
 	private final FloatTensor query;	
 	/**
 	 * @param query
 	 */
-	public DistanceComparator(FloatTensor query){
+	public DistanceComparator2(FloatTensor query){
 		this.query = query;
 	}
 	
@@ -32,9 +32,9 @@ public class DistanceComparator implements Comparator<Candidates>{
 	 * @see java.util.Comparator#compare(java.lang.Object, java.lang.Object)
 	 */
 	@Override
-	public int compare(Candidates one, Candidates other) {
-		Double oneDistance = distance(query,one.tensor);
-		Double otherDistance = distance(query,other.tensor);
+	public int compare(FloatTensor one, FloatTensor other) {
+		Double oneDistance = distance(query,one);
+		Double otherDistance = distance(query,other);
 		return oneDistance.compareTo(otherDistance);
 	}
 }
