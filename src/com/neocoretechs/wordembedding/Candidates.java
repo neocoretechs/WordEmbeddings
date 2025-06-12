@@ -1,6 +1,8 @@
 package com.neocoretechs.wordembedding;
 
-public class Candidates {
+import java.util.Comparator;
+
+public class Candidates implements Comparator<Candidates>{
 		public String word;
 		public double cosDist;
 		public FloatTensor tensor;
@@ -11,5 +13,9 @@ public class Candidates {
 		@Override
 		public boolean equals(Object o) {
 			return word.equals(((Candidates)o).word);
+		}
+		@Override
+		public int compare(Candidates one, Candidates other) {
+			return Double.compare(cosDist,other.cosDist);
 		}
 }

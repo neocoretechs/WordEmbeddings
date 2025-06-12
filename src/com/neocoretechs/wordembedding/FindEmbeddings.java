@@ -7,7 +7,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import com.neocoretechs.lsh.RelatrixLSH;
-import com.neocoretechs.lsh.families.DistanceComparator;
+
 import com.neocoretechs.relatrix.Relatrix;
 import com.neocoretechs.relatrix.Result;
 import com.neocoretechs.rocksack.TransactionId;
@@ -87,7 +87,6 @@ public class FindEmbeddings {
 			F32FloatTensor tTensor = (F32FloatTensor) res.get(1);
 			nearest = index.query(tTensor);
 			System.out.println("Target word index:"+tIndex);
-			DistanceComparator dc = new DistanceComparator(tTensor);
 			List<Candidates> candidateList = new ArrayList<Candidates>();
 			for(int i = 0; i  < nearest.size(); i++) {
 				Candidates can = new Candidates();
@@ -102,9 +101,10 @@ public class FindEmbeddings {
 			}
 			FileUtils.writeFile(candidateList, args[0]+".txt", false);
 			System.out.println("-----");
-			Collections.sort(candidateList,dc);
-			for(Candidates c: candidateList)
-				System.out.println(c);
+			Collections.sort(candidateList, new Candidates());
+			//for(Candidates c: candidateList)
+				//System.out.println(c);
+			FileUtils.writeFile(candidateList, args[0]+"Sorted"+".txt", false);
 		} catch (IllegalAccessException | ClassNotFoundException | IOException e) {
 				e.printStackTrace();
 				System.exit(1);
