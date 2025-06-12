@@ -120,6 +120,21 @@ public class RelatrixLSH implements Serializable, Comparable {
 		}
 		return res;
 	}
+	public List<Result> queryParallel(FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+		List<Result> res = new ArrayList<Result>();
+		ArrayList<Object> iq = new ArrayList<Object>();
+		for(int i = 0; i < hashTable.size(); i++) {
+			Integer combinedHash = hash(hashTable.get(i), query);
+			iq.add(combinedHash);
+		}
+		long tims = System.currentTimeMillis();
+		if(DEBUG)
+			System.out.println("Querying combined hash for table of "+hashTable.size());
+		res = Relatrix.findSetParallel(iq, '?', '?');
+		if(DEBUG)
+			System.out.println((System.currentTimeMillis()-tims)+" ms.");
+		return res;
+	}
 
 	/**
 	 * Add a vector to the index.

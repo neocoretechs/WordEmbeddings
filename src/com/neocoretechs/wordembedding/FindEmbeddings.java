@@ -33,20 +33,6 @@ public class FindEmbeddings {
 	
 	public FindEmbeddings() {}
 	
-	
-    public static double cosineSimilarity(double[] vector1, double[] vector2) {
-        double dotProduct = 0;
-        double magnitude1 = 0;
-        double magnitude2 = 0;
-        for (int i = 0; i < vector1.length; i++) {
-            dotProduct += vector1[i] * vector2[i];
-            magnitude1 += Math.pow(vector1[i], 2);
-            magnitude2 += Math.pow(vector2[i], 2);
-        }
-        magnitude1 = Math.sqrt(magnitude1);
-        magnitude2 = Math.sqrt(magnitude2);
-        return dotProduct / (magnitude1 * magnitude2);
-    }
 	/**
 	 * Command line target word, local node, remote node, remote port
 	 * @param args
@@ -85,7 +71,7 @@ public class FindEmbeddings {
 			res = (Result) it.next();
 			int tIndex = (int) res.get(0);
 			F32FloatTensor tTensor = (F32FloatTensor) res.get(1);
-			nearest = index.query(tTensor);
+			nearest = index.queryParallel(tTensor);
 			System.out.println("Target word index:"+tIndex);
 			List<Candidates> candidateList = new ArrayList<Candidates>();
 			for(int i = 0; i  < nearest.size(); i++) {
@@ -100,16 +86,10 @@ public class FindEmbeddings {
 				}
 			}
 			FileUtils.writeFile(candidateList, args[0]+".txt", false);
-			System.out.println("-----");
-			Collections.sort(candidateList, new Candidates());
-			//for(Candidates c: candidateList)
-				//System.out.println(c);
-			FileUtils.writeFile(candidateList, args[0]+"Sorted"+".txt", false);
 		} catch (IllegalAccessException | ClassNotFoundException | IOException e) {
 				e.printStackTrace();
 				System.exit(1);
 		}
-
 		System.exit(1);
 	}
 
