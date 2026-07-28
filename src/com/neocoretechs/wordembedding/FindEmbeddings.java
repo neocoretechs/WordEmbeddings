@@ -7,7 +7,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import com.neocoretechs.lsh.RelatrixLSH;
-
+import com.neocoretechs.relatrix.Relation;
 import com.neocoretechs.relatrix.Relatrix;
 import com.neocoretechs.relatrix.Result;
 import com.neocoretechs.rocksack.TransactionId;
@@ -51,33 +51,32 @@ public class FindEmbeddings {
 		//}
 		//rtc.endTransaction(xid);
 		//rtc.close();
-		Relatrix.setTablespace(LoadWordEmbedding.embedPath);
 		RelatrixLSH index = null;
 		List<Result> nearest = null;
 		try {
-			Iterator<?> it = Relatrix.findSet('*', "has index", '?');
+			Iterator<?> it = Relatrix.findSet('*', "has index", '*');
 			if(!it.hasNext()) {
 				System.out.println("No LSH index...");
 				System.exit(1);
 			}
 			Result res = (Result) it.next();
-			index = (RelatrixLSH) res.get();
+			index = (RelatrixLSH) ((Relation)res.get()).getRange();
 			// now get the tensor with the target word embedding
-			it = Relatrix.findSet('?',  args[0], '?');
+			it = Relatrix.findSet('*', args[0], '*');
 			if(!it.hasNext()) {
 				System.out.println("No tensor found for target word "+args[0]);
 				System.exit(1);
 			}
 			res = (Result) it.next();
-			int tIndex = (int) res.get(0);
-			F32FloatTensor tTensor = (F32FloatTensor) res.get(1);
+			int tIndex = (int) ((Relation)res.get()).getRange();
+			F32FloatTensor tTensor = (F32FloatTensor) ((Relation)res.get()).getDomain();
 			nearest = index.queryParallel(tTensor);
 			System.out.println("Target word index:"+tIndex);
 			List<Candidates> candidateList = new ArrayList<Candidates>();
 			for(int i = 0; i  < nearest.size(); i++) {
 				Candidates can = new Candidates();
-				can.word = (String) nearest.get(i).get(0);
-				can.tensor = (FloatTensor) nearest.get(i).get(1);
+				can.word = (String) nearest.get(i).get();
+				can.tensor = (FloatTensor) nearest.get(i).get();
 				can.cosDist = FloatTensor.cosineSimilarity(tTensor, can.tensor);
 				int cnt = 0;
 				if(!candidateList.contains(can)) {

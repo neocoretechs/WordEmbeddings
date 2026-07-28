@@ -156,7 +156,6 @@ public class LoadWordEmbedding {
 		//rtc = new RelatrixKVClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
 		//rtc = new RelatrixClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
 		//xid = rtc.getTransactionId();
-		Relatrix.setTablespace(embedPath);
 		ArrayList<F32FloatTensor> tensors = loadTensors(args[0]);
 		RelatrixLSH rlsh = new RelatrixLSH(RelatrixLSH.numberOfHashes, RelatrixLSH.numberOfHashTables, RelatrixLSH.VECTOR_DIMENSION);
 		try {
