@@ -110,7 +110,7 @@ public class RelatrixLSH implements Serializable, Comparable {
 			Integer combinedHash = hash(hashTable.get(i), query);
 			if(DEBUG)
 				System.out.println("Querying combined hash for query "+i+" of "+hashTable.size()+":"+combinedHash);
-			Iterator<?> it = Relatrix.findSet(combinedHash, '?', '?');
+			Iterator<?> it = Relatrix.findSet(combinedHash, '*', '*');
 			int cnt = 0;
 			while(it.hasNext()) {
 				res.add((Result) it.next());
@@ -130,8 +130,8 @@ public class RelatrixLSH implements Serializable, Comparable {
 		long tims = System.currentTimeMillis();
 		if(DEBUG)
 			System.out.println("Querying combined hash for table of "+hashTable.size());
-		res = Relatrix.findSetParallel(iq, '?', '?');
-		if(DEBUG)
+		res = (List<Result>) Relatrix.findSetParallel(iq, '*', '*');
+		if(DEBUG)                                                                         
 			System.out.println((System.currentTimeMillis()-tims)+" ms.");
 		return res;
 	}

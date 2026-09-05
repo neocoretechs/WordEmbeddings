@@ -75,8 +75,8 @@ public class FindEmbeddings {
 			List<Candidates> candidateList = new ArrayList<Candidates>();
 			for(int i = 0; i  < nearest.size(); i++) {
 				Candidates can = new Candidates();
-				can.word = (String) nearest.get(i).get();
-				can.tensor = (FloatTensor) nearest.get(i).get();
+				can.word = (String) nearest.get(i).getDomain();
+				can.tensor = (FloatTensor) nearest.get(i).getRange();
 				can.cosDist = FloatTensor.cosineSimilarity(tTensor, can.tensor);
 				int cnt = 0;
 				if(!candidateList.contains(can)) {
