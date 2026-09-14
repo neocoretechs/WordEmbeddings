@@ -5,13 +5,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.neocoretechs.lsh.RelatrixLSH;
 import com.neocoretechs.relatrix.Relation;
 import com.neocoretechs.relatrix.Relatrix;
+import com.neocoretechs.relatrix.RelatrixTransaction;
 import com.neocoretechs.relatrix.Result;
 import com.neocoretechs.rocksack.TransactionId;
 import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
+import com.neocoretechs.relatrix.key.IndexResolver;
+import com.neocoretechs.relatrix.parallel.ExecutionContextHolder;
+import com.neocoretechs.relatrix.parallel.ParallelExecutionContext;
 
 /**
  * Operates on the inverted index of Glove50b word embedding vectors stored in Relatrix relationships.<p>
@@ -34,27 +39,24 @@ public class FindEmbeddings {
 	public FindEmbeddings() {}
 	
 	/**
-	 * Command line target word, local node, remote node, remote port
-	 * @param args
+	 * Command line target word, remote node, remote port<p>
+	 * If given just word, 1 param on cmdl, perform embedded db search, this assumes -Dtablespace= is on command line.
+	 * @param args word, then optional remove db info
 	 * @throws Exception
 	 */
 	public static void main(String args[]) throws Exception {
-		//String word = args[0];
-		//rtc = new RelatrixClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
-		//xid = rtc.getTransactionId();
-		//int numResults = 5;
-		//ArrayList<F32FloatTensor> tensors = loadTensors(args[0]);
-		//List<String> closestWords = findClosestEmbeddings(word, numResults);
-		//System.out.println("Closest words to '" + word + "':");
-		//for (String closestWord : closestWords) {
-		//	System.out.println(closestWord);
-		//}
-		//rtc.endTransaction(xid);
-		//rtc.close();
-		RelatrixLSH index = null;
-		List<Result> nearest = null;
-		try {
-			Iterator<?> it = Relatrix.findSet('*', "has index", '*');
+		if(args.length == 0) {
+			System.out.println("Usage:target word [remote node] [remote port]");
+			System.exit(1);
+		}
+		String word = args[0];
+		// if we have more than just word
+		if(args.length > 1) {
+			RelatrixLSH index = null;
+			List<Result> nearest = null;
+			rtc = new RelatrixClientTransaction(args[1],Integer.parseInt(args[2]));
+			xid = rtc.getTransactionId();
+			Iterator<?> it = rtc.findSet(xid, '*', "has index", '*');
 			if(!it.hasNext()) {
 				System.out.println("No LSH index...");
 				System.exit(1);
@@ -62,15 +64,16 @@ public class FindEmbeddings {
 			Result res = (Result) it.next();
 			index = (RelatrixLSH) ((Relation)res.get()).getRange();
 			// now get the tensor with the target word embedding
-			it = Relatrix.findSet('*', args[0], '*');
+			it = rtc.findSet(xid, '*', args[0], '*');
 			if(!it.hasNext()) {
 				System.out.println("No tensor found for target word "+args[0]);
+				rtc.endTransaction(xid);
 				System.exit(1);
 			}
 			res = (Result) it.next();
 			int tIndex = (int) ((Relation)res.get()).getRange();
 			F32FloatTensor tTensor = (F32FloatTensor) ((Relation)res.get()).getDomain();
-			nearest = index.queryParallel(tTensor);
+			nearest = index.queryParallel(rtc, xid, tTensor);
 			System.out.println("Target word index:"+tIndex);
 			List<Candidates> candidateList = new ArrayList<Candidates>();
 			for(int i = 0; i  < nearest.size(); i++) {
@@ -84,10 +87,56 @@ public class FindEmbeddings {
 					System.out.print(i+" "+(++cnt)+"\r");
 				}
 			}
-			FileUtils.writeFile(candidateList, args[0]+".txt", false);
-		} catch (IllegalAccessException | ClassNotFoundException | IOException e) {
-				e.printStackTrace();
-				System.exit(1);
+			FileUtils.writeFile(candidateList, word+".txt", false);
+			System.out.println("Wrote "+candidateList.size()+" to "+word+".txt");
+			rtc.endTransaction(xid);
+			//rtc.close();
+		} else {
+			// embedded
+			IndexResolver indexResolver = new IndexResolver();
+			ParallelExecutionContext pec = new ParallelExecutionContext(indexResolver, new ConcurrentHashMap<String,Object>());
+			ScopedValue.where(ExecutionContextHolder.CONTEXT, pec).run(() -> {
+				try {
+					Relatrix.getInstance();	
+					RelatrixLSH index = null;
+					List<Result> nearest = null;
+					Iterator<?> it = Relatrix.findSet('*', "has index", '*');
+					if(!it.hasNext()) {
+						System.out.println("No LSH index...");
+						System.exit(1);
+					}
+					Result res = (Result) it.next();
+					index = (RelatrixLSH) ((Relation)res.get()).getRange();
+					// now get the tensor with the target word embedding
+					it = Relatrix.findSet('*', word, '*');
+					if(!it.hasNext()) {
+						System.out.println("No tensor found for target word "+args[0]);
+						System.exit(1);
+					}
+					res = (Result) it.next();
+					int tIndex = (int) ((Relation)res.get()).getRange();
+					F32FloatTensor tTensor = (F32FloatTensor) ((Relation)res.get()).getDomain();
+					nearest = index.queryParallel(tTensor);
+					System.out.println("Target word index:"+tIndex);
+					List<Candidates> candidateList = new ArrayList<Candidates>();
+					for(int i = 0; i  < nearest.size(); i++) {
+						Candidates can = new Candidates();
+						can.word = (String) nearest.get(i).getDomain();
+						can.tensor = (FloatTensor) nearest.get(i).getRange();
+						can.cosDist = FloatTensor.cosineSimilarity(tTensor, can.tensor);
+						int cnt = 0;
+						if(!candidateList.contains(can)) {
+							candidateList.add(can);
+							System.out.print(i+" "+(++cnt)+"\r");
+						}
+					}
+					FileUtils.writeFile(candidateList, word+".txt", false);
+					System.out.println("Wrote "+candidateList.size()+" to "+word+".txt");
+				} catch (IllegalAccessException | ClassNotFoundException | IOException e) {
+					e.printStackTrace();
+					System.exit(1);
+				}
+			});
 		}
 		System.exit(1);
 	}

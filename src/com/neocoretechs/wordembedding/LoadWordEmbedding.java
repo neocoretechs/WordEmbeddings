@@ -1,33 +1,21 @@
 package com.neocoretechs.wordembedding;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import jdk.incubator.vector.*;
-import java.lang.foreign.Arena;
+import java.util.concurrent.ConcurrentHashMap;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-
-import com.neocoretechs.wordembedding.FloatTensor;
-import com.neocoretechs.wordembedding.F32FloatTensor;
 
 import com.neocoretechs.rocksack.TransactionId;
 
-import com.neocoretechs.lsh.Index;
 import com.neocoretechs.lsh.RelatrixLSH;
 import com.neocoretechs.relatrix.DuplicateKeyException;
 import com.neocoretechs.relatrix.Relatrix;
 import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
 //import com.neocoretechs.relatrix.client.RelatrixKVClientTransaction;
-import com.neocoretechs.relatrix.type.DoubleArray;
+import com.neocoretechs.relatrix.key.IndexResolver;
+import com.neocoretechs.relatrix.parallel.ExecutionContextHolder;
+import com.neocoretechs.relatrix.parallel.ParallelExecutionContext;
 import com.neocoretechs.relatrix.type.FloatArray;
 
 /**
@@ -153,24 +141,54 @@ public class LoadWordEmbedding {
 	 * @throws IllegalAccessException 
 	 */
 	public static void main(String[] args) throws IOException, IllegalAccessException, ClassNotFoundException, DuplicateKeyException {
-		//rtc = new RelatrixKVClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
-		//rtc = new RelatrixClientTransaction(args[1],args[2],Integer.parseInt(args[3]));
-		//xid = rtc.getTransactionId();
-		ArrayList<F32FloatTensor> tensors = loadTensors(args[0]);
-		RelatrixLSH rlsh = new RelatrixLSH(RelatrixLSH.numberOfHashes, RelatrixLSH.numberOfHashTables, RelatrixLSH.VECTOR_DIMENSION);
-		try {
-			Relatrix.store(rlsh.getKey(), "has index", rlsh);
-		} catch (IllegalAccessException | ClassNotFoundException | IOException | DuplicateKeyException e) {
-				e.printStackTrace();
+		if(args.length == 0) {
+			System.out.println("Usage:target path [remote node] [remote port]");
+			System.exit(1);
 		}
-		long tims = System.currentTimeMillis();
-		long tim2 = System.currentTimeMillis();
-		for(int i = 0; i < tensors.size(); i++) {
-			rlsh.add(words.get(i), tensors.get(i));
-			if((System.currentTimeMillis()-tim2) > 5000) {
-				tim2 = System.currentTimeMillis();
-				System.out.println("Loaded "+i+" vectors in "+(System.currentTimeMillis()-tims)+" ms.");
+		String word = args[0];
+		ArrayList<F32FloatTensor> tensors = loadTensors(word);
+		RelatrixLSH rlsh = new RelatrixLSH(RelatrixLSH.numberOfHashes, RelatrixLSH.numberOfHashTables, RelatrixLSH.VECTOR_DIMENSION);
+		// if we have more than just word
+		if(args.length > 1) {
+			rtc = new RelatrixClientTransaction(args[1],Integer.parseInt(args[2]));
+			xid = rtc.getTransactionId();
+			try {
+				rtc.store(xid, rlsh.getKey(), "has index", rlsh);
+			} catch (IOException e) {
+				e.printStackTrace();
+				rtc.endTransaction(xid);
+				System.exit(1);
 			}
+			long tims = System.currentTimeMillis();
+			long tim2 = System.currentTimeMillis();
+			for(int i = 0; i < tensors.size(); i++) {
+				rlsh.add(rtc, xid, words.get(i), tensors.get(i));
+				if((System.currentTimeMillis()-tim2) > 5000) {
+					tim2 = System.currentTimeMillis();
+					System.out.println("Loaded "+i+" vectors in "+(System.currentTimeMillis()-tims)+" ms.");
+				}
+			}
+			rtc.commit(xid);
+			rtc.endTransaction(xid);
+		} else {
+			IndexResolver indexResolver = new IndexResolver();
+			ParallelExecutionContext pec = new ParallelExecutionContext(indexResolver, new ConcurrentHashMap<String,Object>());
+			ScopedValue.where(ExecutionContextHolder.CONTEXT, pec).run(() -> {
+				try {
+					Relatrix.store(rlsh.getKey(), "has index", rlsh);
+				} catch (IllegalAccessException | ClassNotFoundException | IOException | DuplicateKeyException e) {
+					e.printStackTrace();
+				}
+				long tims = System.currentTimeMillis();
+				long tim2 = System.currentTimeMillis();
+				for(int i = 0; i < tensors.size(); i++) {
+					rlsh.add(words.get(i), tensors.get(i));
+					if((System.currentTimeMillis()-tim2) > 5000) {
+						tim2 = System.currentTimeMillis();
+						System.out.println("Loaded "+i+" vectors in "+(System.currentTimeMillis()-tims)+" ms.");
+					}
+				}
+			});
 		}
 	}
 }

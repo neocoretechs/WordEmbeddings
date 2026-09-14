@@ -12,6 +12,8 @@ import com.neocoretechs.lsh.families.CosineHash;
 import com.neocoretechs.relatrix.DuplicateKeyException;
 import com.neocoretechs.relatrix.Relatrix;
 import com.neocoretechs.relatrix.Result;
+import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
+import com.neocoretechs.rocksack.TransactionId;
 import com.neocoretechs.wordembedding.FloatTensor;
 import com.neocoretechs.wordembedding.Parallel;
 
@@ -120,6 +122,22 @@ public class RelatrixLSH implements Serializable, Comparable {
 		}
 		return res;
 	}
+	public List<Result> query(RelatrixClientTransaction rct, TransactionId xid, FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+		ArrayList<Result> res = new ArrayList<Result>();
+		for(int i = 0; i < hashTable.size(); i++) {
+			Integer combinedHash = hash(hashTable.get(i), query);
+			if(DEBUG)
+				System.out.println("Querying combined hash for query "+i+" of "+hashTable.size()+":"+combinedHash);
+			Iterator<?> it = rct.findSet(xid, combinedHash, '*', '*');
+			int cnt = 0;
+			while(it.hasNext()) {
+				res.add((Result) it.next());
+				System.out.print(++cnt+"\r");
+			}
+			System.out.println();
+		}
+		return res;
+	}
 	public List<Result> queryParallel(FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
 		List<Result> res = new ArrayList<Result>();
 		ArrayList<Object> iq = new ArrayList<Object>();
@@ -135,7 +153,21 @@ public class RelatrixLSH implements Serializable, Comparable {
 			System.out.println((System.currentTimeMillis()-tims)+" ms.");
 		return res;
 	}
-
+	public List<Result> queryParallel(RelatrixClientTransaction rct, TransactionId xid, FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+		List<Result> res = new ArrayList<Result>();
+		ArrayList<Object> iq = new ArrayList<Object>();
+		for(int i = 0; i < hashTable.size(); i++) {
+			Integer combinedHash = hash(hashTable.get(i), query);
+			iq.add(combinedHash);
+		}
+		long tims = System.currentTimeMillis();
+		if(DEBUG)
+			System.out.println("Querying combined hash for table of "+hashTable.size());
+		res = (List<Result>) rct.findSetParallel(xid, iq, '*', '*');
+		if(DEBUG)                                                                         
+			System.out.println((System.currentTimeMillis()-tims)+" ms.");
+		return res;
+	}
 	/**
 	 * Add a vector to the index.
 	 * @param word the word that vectorized
@@ -158,6 +190,18 @@ public class RelatrixLSH implements Serializable, Comparable {
 		});
 	}
 	
+	public void add(RelatrixClientTransaction rct, TransactionId xid, String word, FloatTensor vector) {
+		//for(int i = 0; i < hashTable.size(); i++) {
+		Parallel.parallelFor(0, hashTable.size(), i-> {
+			Integer combinedHash = hash(hashTable.get(i), vector);
+			try {
+				rct.store(xid, combinedHash, word, vector);
+			} catch (IOException e) {
+				System.out.println("duplicate key:"+combinedHash+" for "+word);
+				throw new RuntimeException(e);
+			}
+		});
+	}
 	/**
 	 * Calculate the combined hash for a vector.
 	 * @param hash one of numberOfHashes
