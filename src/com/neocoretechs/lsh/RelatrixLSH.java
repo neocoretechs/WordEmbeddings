@@ -145,15 +145,17 @@ public class RelatrixLSH implements Serializable, Comparable {
 	 * @throws ClassNotFoundException 
 	 * @throws IllegalAccessException 
 	 */
-	public void add(String word, FloatTensor vector) throws IllegalAccessException, ClassNotFoundException, IOException {
-		for(int i = 0; i < hashTable.size(); i++) {
+	public void add(String word, FloatTensor vector) {
+		//for(int i = 0; i < hashTable.size(); i++) {
+		Parallel.parallelFor(0, hashTable.size(), i-> {
 			Integer combinedHash = hash(hashTable.get(i), vector);
 			try {
 				Relatrix.store(combinedHash, word, vector);
-			} catch (DuplicateKeyException e) {
+			} catch (DuplicateKeyException | IllegalAccessException | ClassNotFoundException | IOException e) {
 				System.out.println("duplicate key:"+combinedHash+" for "+word);
+				throw new RuntimeException(e);
 			}
-		}
+		});
 	}
 	
 	/**
