@@ -12,7 +12,8 @@ import com.neocoretechs.lsh.families.CosineHash;
 import com.neocoretechs.relatrix.DuplicateKeyException;
 import com.neocoretechs.relatrix.Relatrix;
 import com.neocoretechs.relatrix.Result;
-import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
+import com.neocoretechs.relatrix.client.RelatrixClientTransactionInterface;
+import com.neocoretechs.relatrix.client.json.RelatrixClientJsonTransaction;
 import com.neocoretechs.rocksack.TransactionId;
 import com.neocoretechs.wordembedding.FloatTensor;
 import com.neocoretechs.wordembedding.Parallel;
@@ -122,7 +123,7 @@ public class RelatrixLSH implements Serializable, Comparable {
 		}
 		return res;
 	}
-	public List<Result> query(RelatrixClientTransaction rct, TransactionId xid, FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+	public List<Result> query(RelatrixClientTransactionInterface rct, TransactionId xid, FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
 		ArrayList<Result> res = new ArrayList<Result>();
 		for(int i = 0; i < hashTable.size(); i++) {
 			Integer combinedHash = hash(hashTable.get(i), query);
@@ -153,7 +154,7 @@ public class RelatrixLSH implements Serializable, Comparable {
 			System.out.println((System.currentTimeMillis()-tims)+" ms.");
 		return res;
 	}
-	public List<Result> queryParallel(RelatrixClientTransaction rct, TransactionId xid, FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+	public List<Result> queryParallel(RelatrixClientTransactionInterface rct, TransactionId xid, FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
 		List<Result> res = new ArrayList<Result>();
 		ArrayList<Object> iq = new ArrayList<Object>();
 		for(int i = 0; i < hashTable.size(); i++) {
@@ -190,12 +191,12 @@ public class RelatrixLSH implements Serializable, Comparable {
 		});
 	}
 	
-	public void add(RelatrixClientTransaction rct, TransactionId xid, String word, FloatTensor vector) {
+	public void add(RelatrixClientJsonTransaction rtc, TransactionId xid, String word, FloatTensor vector) {
 		//for(int i = 0; i < hashTable.size(); i++) {
 		Parallel.parallelFor(0, hashTable.size(), i-> {
 			Integer combinedHash = hash(hashTable.get(i), vector);
 			try {
-				rct.store(xid, combinedHash, word, vector);
+				rtc.store(xid, combinedHash, word, vector);
 			} catch (IOException e) {
 				System.out.println("duplicate key:"+combinedHash+" for "+word);
 				throw new RuntimeException(e);

@@ -11,7 +11,7 @@ import com.neocoretechs.rocksack.TransactionId;
 import com.neocoretechs.lsh.RelatrixLSH;
 import com.neocoretechs.relatrix.DuplicateKeyException;
 import com.neocoretechs.relatrix.Relatrix;
-import com.neocoretechs.relatrix.client.RelatrixClientTransaction;
+import com.neocoretechs.relatrix.client.json.RelatrixClientJsonTransaction;
 //import com.neocoretechs.relatrix.client.RelatrixKVClientTransaction;
 import com.neocoretechs.relatrix.key.IndexResolver;
 import com.neocoretechs.relatrix.parallel.ExecutionContextHolder;
@@ -27,7 +27,7 @@ public class LoadWordEmbedding {
 	private static final int VECTOR_DIMENSION = 50;
 	//GLOVE_FILE = "glove.6B.50d.txt";
 	//private static RelatrixKVClientTransaction rtc;
-	private static RelatrixClientTransaction rtc;
+	private static RelatrixClientJsonTransaction rtc;
 	private static TransactionId xid;
 	private static int COMMITRATE = 1000;
 	public static ArrayList<F32FloatTensor> tensors = new ArrayList<F32FloatTensor>();
@@ -150,7 +150,7 @@ public class LoadWordEmbedding {
 		RelatrixLSH rlsh = new RelatrixLSH(RelatrixLSH.numberOfHashes, RelatrixLSH.numberOfHashTables, RelatrixLSH.VECTOR_DIMENSION);
 		// if we have more than just word
 		if(args.length > 1) {
-			rtc = new RelatrixClientTransaction(args[1],Integer.parseInt(args[2]));
+			rtc = new RelatrixClientJsonTransaction(args[1],Integer.parseInt(args[2]));
 			xid = rtc.getTransactionId();
 			try {
 				rtc.store(xid, rlsh.getKey(), "has index", rlsh);
