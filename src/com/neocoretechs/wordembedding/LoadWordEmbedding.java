@@ -163,9 +163,10 @@ public class LoadWordEmbedding {
 			long tim2 = System.currentTimeMillis();
 			for(int i = 0; i < tensors.size(); i++) {
 				rlsh.add(rtc, xid, words.get(i), tensors.get(i));
-				if((System.currentTimeMillis()-tim2) > 5000) {
+				if((System.currentTimeMillis()-tim2) > 10000) {
 					tim2 = System.currentTimeMillis();
 					System.out.println("Loaded "+i+" vectors in "+(System.currentTimeMillis()-tims)+" ms.");
+					rtc.commit(xid);
 				}
 			}
 			rtc.commit(xid);
@@ -183,7 +184,7 @@ public class LoadWordEmbedding {
 				long tim2 = System.currentTimeMillis();
 				for(int i = 0; i < tensors.size(); i++) {
 					rlsh.add(words.get(i), tensors.get(i));
-					if((System.currentTimeMillis()-tim2) > 5000) {
+					if((System.currentTimeMillis()-tim2) > 10000) {
 						tim2 = System.currentTimeMillis();
 						System.out.println("Loaded "+i+" vectors in "+(System.currentTimeMillis()-tims)+" ms.");
 					}

@@ -14,6 +14,7 @@ import com.neocoretechs.relatrix.Relatrix;
 import com.neocoretechs.relatrix.Result;
 import com.neocoretechs.relatrix.client.RelatrixClientTransactionInterface;
 import com.neocoretechs.relatrix.client.json.RelatrixClientJsonTransaction;
+import com.neocoretechs.relatrix.key.NoIndex;
 import com.neocoretechs.rocksack.TransactionId;
 import com.neocoretechs.wordembedding.FloatTensor;
 import com.neocoretechs.wordembedding.Parallel;
@@ -183,10 +184,10 @@ public class RelatrixLSH implements Serializable, Comparable {
 		Parallel.parallelFor(0, hashTable.size(), i-> {
 			Integer combinedHash = hash(hashTable.get(i), vector);
 			try {
-				Relatrix.store(combinedHash, word, vector);
+				Relatrix.store(combinedHash, word, NoIndex.create(vector));
 			} catch (DuplicateKeyException | IllegalAccessException | ClassNotFoundException | IOException e) {
 				System.out.println("duplicate key:"+combinedHash+" for "+word);
-				throw new RuntimeException(e);
+				//throw new RuntimeException(e);
 			}
 		});
 	}
@@ -194,12 +195,13 @@ public class RelatrixLSH implements Serializable, Comparable {
 	public void add(RelatrixClientJsonTransaction rtc, TransactionId xid, String word, FloatTensor vector) {
 		//for(int i = 0; i < hashTable.size(); i++) {
 		Parallel.parallelFor(0, hashTable.size(), i-> {
-			Integer combinedHash = hash(hashTable.get(i), vector);
+			NoIndex ni = NoIndex.create(vector);
+			Integer combinedHash = hash(hashTable.get(i), (FloatTensor) ni.getInstance());
 			try {
-				rtc.store(xid, combinedHash, word, vector);
+				rtc.store(xid, combinedHash, word, ni);
 			} catch (IOException e) {
 				System.out.println("duplicate key:"+combinedHash+" for "+word);
-				throw new RuntimeException(e);
+				//throw new RuntimeException(e);
 			}
 		});
 	}
