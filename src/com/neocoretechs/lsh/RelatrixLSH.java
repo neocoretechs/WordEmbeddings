@@ -15,6 +15,7 @@ import com.neocoretechs.relatrix.Result;
 import com.neocoretechs.relatrix.client.RelatrixClientTransactionInterface;
 import com.neocoretechs.relatrix.client.json.RelatrixClientJsonTransaction;
 import com.neocoretechs.relatrix.key.NoIndex;
+import com.neocoretechs.relatrix.type.RelationList;
 import com.neocoretechs.rocksack.TransactionId;
 import com.neocoretechs.wordembedding.FloatTensor;
 import com.neocoretechs.wordembedding.Parallel;
@@ -140,8 +141,8 @@ public class RelatrixLSH implements Serializable, Comparable {
 		}
 		return res;
 	}
-	public List<Result> queryParallel(FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
-		List<Result> res = new ArrayList<Result>();
+	public RelationList queryParallel(FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+		RelationList res = null;
 		ArrayList<Object> iq = new ArrayList<Object>();
 		for(int i = 0; i < hashTable.size(); i++) {
 			Integer combinedHash = hash(hashTable.get(i), query);
@@ -150,13 +151,13 @@ public class RelatrixLSH implements Serializable, Comparable {
 		long tims = System.currentTimeMillis();
 		if(DEBUG)
 			System.out.println("Querying combined hash for table of "+hashTable.size());
-		res = (List<Result>) Relatrix.findSetParallel(iq, '*', '*');
+		res = (RelationList) Relatrix.findSetParallel(iq, '*', '*');
 		if(DEBUG)                                                                         
 			System.out.println((System.currentTimeMillis()-tims)+" ms.");
 		return res;
 	}
-	public List<Result> queryParallel(RelatrixClientTransactionInterface rct, TransactionId xid, FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
-		List<Result> res = new ArrayList<Result>();
+	public RelationList queryParallel(RelatrixClientTransactionInterface rct, TransactionId xid, FloatTensor query) throws IllegalArgumentException, ClassNotFoundException, IllegalAccessException, IOException {
+		RelationList res = null;
 		ArrayList<Object> iq = new ArrayList<Object>();
 		for(int i = 0; i < hashTable.size(); i++) {
 			Integer combinedHash = hash(hashTable.get(i), query);
@@ -165,7 +166,7 @@ public class RelatrixLSH implements Serializable, Comparable {
 		long tims = System.currentTimeMillis();
 		if(DEBUG)
 			System.out.println("Querying combined hash for table of "+hashTable.size());
-		res = (List<Result>) rct.findSetParallel(xid, iq, '*', '*');
+		res =  (RelationList) rct.findSetParallel(xid, iq, '*', '*');
 		if(DEBUG)                                                                         
 			System.out.println((System.currentTimeMillis()-tims)+" ms.");
 		return res;

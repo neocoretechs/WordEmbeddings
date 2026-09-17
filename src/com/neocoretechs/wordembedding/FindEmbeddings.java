@@ -19,6 +19,7 @@ import com.neocoretechs.relatrix.key.IndexResolver;
 import com.neocoretechs.relatrix.key.NoIndex;
 import com.neocoretechs.relatrix.parallel.ExecutionContextHolder;
 import com.neocoretechs.relatrix.parallel.ParallelExecutionContext;
+import com.neocoretechs.relatrix.type.RelationList;
 
 /**
  * Operates on the inverted index of Glove50b word embedding vectors stored in Relatrix relationships.<p>
@@ -37,6 +38,7 @@ public class FindEmbeddings {
 	private static TransactionId xid;
 	static long tims = System.currentTimeMillis();
 	static int cnt2 = 0;
+	private static boolean DEBUG = true;
 	
 	public FindEmbeddings() {}
 	
@@ -55,7 +57,7 @@ public class FindEmbeddings {
 		// if we have more than just word
 		if(args.length > 1) {
 			RelatrixLSH index = null;
-			List<Result> nearest = null;
+			RelationList nearest = null;
 			rtc = new RelatrixClientJsonTransaction(args[1],Integer.parseInt(args[2]));
 			xid = rtc.getTransactionId();
 			Iterator<?> it = rtc.findSet(xid, '*', "has index", '*');
@@ -74,14 +76,20 @@ public class FindEmbeddings {
 			}
 			res = (Result) it.next();
 			int tIndex = (int) Integer.valueOf(res.getDomain().toString());
-			F32FloatTensor tTensor = (F32FloatTensor) (((NoIndex) res.getRange())).getInstance();
+			if(DEBUG )
+				System.out.println("Result range="+res.getRange()+" Class:"+res.getRange().getClass());
+			F32FloatTensor tTensor = (F32FloatTensor) res.getRange();
+			if(DEBUG )
+				System.out.println("Result tensor="+tTensor+" Class:"+tTensor.getClass());
 			nearest = index.queryParallel(rtc, xid, tTensor);
-			System.out.println("Target word index:"+tIndex);
+			System.out.println("Target word index:"+tIndex+" got nearest:"+nearest.size());
 			List<Candidates> candidateList = new ArrayList<Candidates>();
+			if(DEBUG )
+				System.out.println("Nearest Result range="+((AbstractRelation)nearest.get(0)).getRange()+" Class:"+((AbstractRelation)nearest.get(0)).getRange().getClass());
 			for(int i = 0; i  < nearest.size(); i++) {
 				Candidates can = new Candidates();
-				can.word = (String) nearest.get(i).getDomain();
-				can.tensor = (F32FloatTensor) (((NoIndex)nearest.get(i).getRange())).getInstance();
+				can.word = (String) ((AbstractRelation)nearest.get(i)).getMap();
+				can.tensor = (F32FloatTensor) ((AbstractRelation)nearest.get(i)).getRange();
 				can.cosDist = FloatTensor.cosineSimilarity(tTensor, can.tensor);
 				int cnt = 0;
 				if(!candidateList.contains(can)) {
@@ -101,7 +109,7 @@ public class FindEmbeddings {
 				try {
 					Relatrix.getInstance();	
 					RelatrixLSH index = null;
-					List<Result> nearest = null;
+					RelationList nearest = null;
 					Iterator<?> it = RelatrixJson.findSet('*', "has index", '*');
 					if(!it.hasNext()) {
 						System.out.println("No LSH index...");
@@ -118,13 +126,13 @@ public class FindEmbeddings {
 					res = (Result) it.next();
 					int tIndex = (int) ((Relation)res.get()).getRange();
 					F32FloatTensor tTensor = (F32FloatTensor) ((Relation)res.get()).getDomain();
-					nearest = index.queryParallel(tTensor);
+					nearest = (RelationList) index.queryParallel(tTensor);
 					System.out.println("Target word index:"+tIndex);
 					List<Candidates> candidateList = new ArrayList<Candidates>();
 					for(int i = 0; i  < nearest.size(); i++) {
 						Candidates can = new Candidates();
-						can.word = (String) nearest.get(i).getDomain();
-						can.tensor = (F32FloatTensor) (((NoIndex)nearest.get(i).getRange())).getInstance();
+						can.word = (String) ((AbstractRelation)nearest.get(i)).getDomain();
+						can.tensor = (F32FloatTensor) ((AbstractRelation)nearest.get(i)).getRange();
 						can.cosDist = FloatTensor.cosineSimilarity(tTensor, can.tensor);
 						int cnt = 0;
 						if(!candidateList.contains(can)) {
