@@ -29,7 +29,12 @@ import com.neocoretechs.relatrix.type.RelationList;
  * search space from over 400k to less than 25k.<p>
  * The purpose is to illustrate Relatix as a vector store that can process embeddings efficiently.<p>
  * Uses cosine similarity.  Euclidean distance or Manhattan distance, may affect the results.
- * @author groff
+ * We store the Float32 tensors using the NoIndex construct in the range value, preventing it from being stored as an instance,
+ * as there is no need to query on this value. Consequently no F32FloatTensor table will be constructed.<p>
+ * This class retrieves the tensors for a given word index, then performs cosine similarity on the results and writes the collection
+ * to a result file. Similarity will be from 1 to -1 with 1 and values near 1 being more similar. A search of the file for cos:0.9 cos:0.8 and cos:0.7 will
+ * show the most relevant results. There is no particular order to the results.
+ * @author Jonathan Groff Copyright (C) NeoCoreTechs 2025
  *
  */
 public class FindEmbeddings {

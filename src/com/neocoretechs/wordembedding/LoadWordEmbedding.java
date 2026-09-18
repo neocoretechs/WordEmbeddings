@@ -19,8 +19,22 @@ import com.neocoretechs.relatrix.parallel.ParallelExecutionContext;
 import com.neocoretechs.relatrix.type.FloatArray;
 
 /**
- * Load the Glove data file into the K/V store.
- * @author groff
+ * Load the Glove data file into the Relatrix store.<p>
+ * Operates on the inverted index of Glove50b word embedding vectors stored in Relatrix relationships.<p>
+ * This equates to the word mapped to a quantized value of each of the 50 vector elements mapped to the
+ * double array of vector values. The search takes the target word, gets the array of embedded values, quantizes them,
+ * retrieves each word that is mapped to each quantized value, then does the cosine similarity. This should reduce the
+ * search space from over 400k to less than 25k.<p>
+ * The purpose is to illustrate Relatix as a vector store that can process embeddings efficiently.<p>
+ * Uses cosine similarity.  Euclidean distance or Manhattan distance, may affect the results.
+ * We store the Float32 tensors using the NoIndex construct in the range value, preventing it from being stored as an instance,
+ * as there is no need to query on this value. Consequently no F32FloatTensor table will be constructed.<p>
+ * Designed to read the Glove6B dataset which includes vectors of 50 to 100 elements. The value of the field
+ * VECTOR_DIMENSION can be changed for the different datasets. Default is 50. A timed commit of 10 seconds is
+ * performed on the remote Relatrix JSON transaction database server. com.neocoretechs.relatrix.server.json.RelatrixTransactionServerJson
+ * process must be started on a remote node and port with the -Dtablespace= environment variable set on the command line, or
+ * if the remote node and port arguments are left out, an embedded database will be used, again controlled by the -Dtablespace environment
+ * @author Jonathan Groff Copyright (C) NeoCoreTechs 2025
  *
  */
 public class LoadWordEmbedding {
